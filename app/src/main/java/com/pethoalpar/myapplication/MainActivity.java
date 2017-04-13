@@ -184,6 +184,7 @@ public class MainActivity extends AppCompatActivity {
                         break;
             }
             Utils.bitmapToMat(bitmap, imageMat);
+            imageView.setImageBitmap(bitmap);
             detectText(imageMat);
         }else{
             Toast.makeText(getApplicationContext(),"Problem", Toast.LENGTH_SHORT).show();
