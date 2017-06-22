@@ -47,18 +47,16 @@ import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
+    public static final int REQUEST_CODE = 1024;
     private static final String TAG = MainActivity.class.getSimpleName();
-    private Uri outputFileDir;
     private static final String DATA_PATH = Environment.getExternalStorageDirectory().toString()+"/Tess";
     private static final String TESS_DATA = "/tessdata";
-    private TessBaseAPI tessBaseAPI;
-
-    private ImageView imageView;
-    private TextView textView;
-
     Mat imageMat;
     Mat imageMat2;
-
+    private Uri outputFileDir;
+    private TessBaseAPI tessBaseAPI;
+    private ImageView imageView;
+    private TextView textView;
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
         public void onManagerConnected(int status) {
@@ -121,18 +119,23 @@ public class MainActivity extends AppCompatActivity {
         final Activity activity = this;
         imageView = (ImageView) this.findViewById(R.id.imageView);
         textView = (TextView) this.findViewById(R.id.textView);
+        checkPermissions();
         this.findViewById(R.id.button).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if(ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED){
-                    ActivityCompat.requestPermissions(activity, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE},120);
-                }
-                if(ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED){
-                    ActivityCompat.requestPermissions(activity, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},121);
-                }
+                checkPermissions();
                 startCameraActivity();
             }
         });
+    }
+
+    private void checkPermissions() {
+        if (ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, 120);
+        }
+        if (ContextCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 121);
+        }
     }
 
     private void startCameraActivity(){
@@ -147,7 +150,7 @@ public class MainActivity extends AppCompatActivity {
             final Intent pictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
             pictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, outputFileDir);
             if( pictureIntent.resolveActivity(getPackageManager()) != null){
-                startActivityForResult(pictureIntent, 100);
+                startActivityForResult(pictureIntent, REQUEST_CODE);
             }
         } catch (Exception e){
             Log.e(TAG, e.getMessage());
@@ -156,38 +159,43 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if(requestCode == 100 && resultCode == Activity.RESULT_OK){
-            prepareTessData();
-            BitmapFactory.Options options = new BitmapFactory.Options();
-            options.inSampleSize = 10;
-            Bitmap bitmap = BitmapFactory.decodeFile(outputFileDir.getPath(), options);
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_CODE) {
+            if (resultCode == Activity.RESULT_OK) {
+                prepareTessData();
+                BitmapFactory.Options options = new BitmapFactory.Options();
+                options.inSampleSize = 10;
+                Bitmap bitmap = BitmapFactory.decodeFile(outputFileDir.getPath(), options);
 
-            ExifInterface ei = null;
-            try{
-                ei = new ExifInterface(outputFileDir.getPath());
-            } catch (IOException e){
-                Log.d(TAG,"IO problem");
-            }
-            int orientation = ei.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_UNDEFINED);
-            switch (orientation){
-                case ExifInterface.ORIENTATION_ROTATE_90 :
-                    bitmap = rotateImage(bitmap, 90);
-                    break;
-                case ExifInterface.ORIENTATION_ROTATE_180 :
-                    bitmap = rotateImage(bitmap, 180);
-                    break;
-                case ExifInterface.ORIENTATION_ROTATE_270 :
-                    bitmap = rotateImage(bitmap, 270);
-                    break;
-                case ExifInterface.ORIENTATION_NORMAL :
+                ExifInterface ei = null;
+                try {
+                    ei = new ExifInterface(outputFileDir.getPath());
+                } catch (IOException e) {
+                    Log.d(TAG, "IO problem");
+                }
+                int orientation = ei.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_UNDEFINED);
+                switch (orientation) {
+                    case ExifInterface.ORIENTATION_ROTATE_90:
+                        bitmap = rotateImage(bitmap, 90);
+                        break;
+                    case ExifInterface.ORIENTATION_ROTATE_180:
+                        bitmap = rotateImage(bitmap, 180);
+                        break;
+                    case ExifInterface.ORIENTATION_ROTATE_270:
+                        bitmap = rotateImage(bitmap, 270);
+                        break;
+                    case ExifInterface.ORIENTATION_NORMAL:
                     default:
                         break;
+                }
+                Utils.bitmapToMat(bitmap, imageMat);
+                imageView.setImageBitmap(bitmap);
+                detectText(imageMat);
+            } else if (resultCode == Activity.RESULT_CANCELED) {
+                Toast.makeText(getApplicationContext(), "Canceled", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(getApplicationContext(), "Problem", Toast.LENGTH_SHORT).show();
             }
-            Utils.bitmapToMat(bitmap, imageMat);
-            imageView.setImageBitmap(bitmap);
-            detectText(imageMat);
-        }else{
-            Toast.makeText(getApplicationContext(),"Problem", Toast.LENGTH_SHORT).show();
         }
     }
 
